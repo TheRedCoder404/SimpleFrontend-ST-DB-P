@@ -103,3 +103,48 @@ Then open http://localhost:8081 in your browser.
    - User preference persisted across sessions using `app.storage.user`
    - storage_secret configured in ui.run() for security
    - Fixed import error by adding `app` to the imports from nicegui
+
+## 2025-11-21 - Docker Deployment Setup
+
+### Changes Implemented
+1. ✅ **Docker and Docker Compose Configuration**: Created complete Docker deployment setup. Features:
+   - **Dockerfile**: Multi-stage build for Python application with all dependencies
+   - **docker-compose.yml**: Orchestrates web app and MySQL database containers
+   - **Environment Variable Configuration**: All settings configurable via `.env` file
+     - Database: host, port, user, password, database name
+     - Application: port, storage secret
+   - **Health Checks**: MySQL container health check ensures database is ready before app starts
+   - **Persistent Storage**: MySQL data stored in Docker volume
+   - **Network Isolation**: Containers communicate via private Docker network
+   - **Database Initialization**: `init.sql` file for schema setup on first run
+
+2. ✅ **Code Updates for Environment Variables**:
+   - Modified `database.py` to read DB config from environment variables
+   - Modified `main.py` to read app config from environment variables
+   - Added `host='0.0.0.0'` to ui.run() for Docker container accessibility
+
+3. ✅ **Documentation**:
+   - Created comprehensive README.md with Docker deployment instructions
+   - Added `.env.example` file with all configurable options
+   - Added `.dockerignore` to optimize Docker build
+   - Created `init.sql` template for database schema initialization
+   - Included troubleshooting section for common issues
+
+### How to Deploy
+```bash
+# Copy and edit environment file
+cp .env.example .env
+nano .env
+
+# Start the stack
+docker-compose up -d
+
+# Access at http://localhost:8081
+```
+
+### Technical Notes
+- Uses Python 3.14 base image
+- MySQL 8.0 for database
+- Automatic container restart on failure
+- Database connection waits for healthy MySQL container
+- All configuration externalized to environment variables

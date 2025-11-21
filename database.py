@@ -1,17 +1,18 @@
 import mysql.connector
 from typing import List, Dict, Any, Optional
 from contextlib import contextmanager
+import os
 
 class Database:
     """Database connection and operations handler"""
 
     def __init__(self):
         self.config = {
-            'host': 'localhost',
-            'port': 3306,
-            'user': 'root',
-            'password': 'secret',
-            'database': 'scooteq_database'
+            'host': os.getenv('DB_HOST', 'localhost'),
+            'port': int(os.getenv('DB_PORT', '3306')),
+            'user': os.getenv('DB_USER', 'root'),
+            'password': os.getenv('DB_PASSWORD', 'secret'),
+            'database': os.getenv('DB_NAME', 'scooteq_database')
         }
 
     @contextmanager

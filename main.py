@@ -2,6 +2,7 @@ from nicegui import ui, app
 from database import Database
 from typing import Optional, Dict, Any
 from datetime import datetime
+import os
 
 # Initialize database
 db = Database()
@@ -401,4 +402,9 @@ def main_page(table: str = 'Devices', page: int = 1, per_page: int = 25):
         render_table_page(table, per_page, page)
 
 
-ui.run(port=8081, reload=False, storage_secret='scooteq_secret_key_change_in_production')
+ui.run(
+    host='0.0.0.0',
+    port=int(os.getenv('APP_PORT', '8081')),
+    reload=False,
+    storage_secret=os.getenv('STORAGE_SECRET', 'scooteq_secret_key_change_in_production')
+)
