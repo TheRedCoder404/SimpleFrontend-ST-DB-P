@@ -1,6 +1,6 @@
 from nicegui import ui, app
 from database import Database
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 from datetime import datetime
 import os
 
@@ -19,7 +19,7 @@ TABLE_CONFIG = {
 
 
 def format_value(value: Any) -> str:
-    """Format values for display"""
+    # Format values for display
     if value is None:
         return ''
     if isinstance(value, datetime):
@@ -28,45 +28,48 @@ def format_value(value: Any) -> str:
 
 
 def format_field_label(field_name: str) -> str:
-    """Format field name for display, removing '_id' suffix"""
+    # Format field name for display, removing '_id' suffix
     label = field_name.replace('_', ' ').title()
     # Remove " Id" suffix from foreign key fields
-    if label.endswith(' Id') and field_name != 'id':
-        label = label[:-3]  # Remove the last 3 characters (" Id")
-    return label
+    return label.replace(' Id', '')
 
 
 def get_foreign_key_display(table_name: str, column_name: str, value: Any) -> str:
-    """Get display value for foreign keys"""
+    # Get display value for foreign keys
     if value is None:
         return ''
 
     try:
-        if column_name == 'manufacturer_id':
-            manufacturers = db.get_manufacturers()
-            for m in manufacturers:
-                if m['id'] == value:
-                    return m['name']
-        elif column_name == 'device_type_id':
-            types = db.get_device_types()
-            for t in types:
-                if t['id'] == value:
-                    return t['device_type']
-        elif column_name == 'department_id':
-            departments = db.get_departments()
-            for d in departments:
-                if d['id'] == value:
-                    return d['name']
-        elif column_name == 'employee_id':
-            employees = db.get_employees()
-            for e in employees:
-                if e['id'] == value:
-                    return f"{e['first_name']} {e['last_name']}"
-        elif column_name == 'device_id':
-            devices = db.get_devices()
-            for d in devices:
-                if d['id'] == value:
-                    return f"{d['model']} ({d['serial_number']})"
+        match column_name:
+            case 'manufacturer_id':
+                manufacturers = db.get_manufacturers()
+                for m in manufacturers:
+                    if m['id'] == value:
+                        return m['name']
+
+            case'device_type_id':
+                types = db.get_device_types()
+                for t in types:
+                    if t['id'] == value:
+                        return t['device_type']
+
+            case 'department_id':
+                departments = db.get_departments()
+                for d in departments:
+                    if d['id'] == value:
+                        return d['name']
+
+            case 'employee_id':
+                employees = db.get_employees()
+                for e in employees:
+                    if e['id'] == value:
+                        return f"{e['first_name']} {e['last_name']}"
+
+            case 'device_id':
+                devices = db.get_devices()
+                for d in devices:
+                    if d['id'] == value:
+                        return f"{d['model']} ({d['serial_number']})"
     except:
         pass
 
@@ -74,7 +77,7 @@ def get_foreign_key_display(table_name: str, column_name: str, value: Any) -> st
 
 
 def create_form_field(column_info: Dict[str, Any], initial_value: Any = None, table_name: str = None, is_new: bool = True):
-    """Create appropriate form field based on column type"""
+    # Create appropriate form field based on column type
     field_name = column_info['Field']
     field_type = column_info['Type']
     is_nullable = column_info['Null'] == 'YES'
@@ -90,65 +93,67 @@ def create_form_field(column_info: Dict[str, Any], initial_value: Any = None, ta
     label = format_field_label(field_name)
 
     # Handle foreign keys with dropdowns
-    if field_name == 'manufacturer_id':
-        manufacturers = db.get_manufacturers()
-        if not manufacturers:
-            return ui.label(f'{label}: No manufacturers available').classes('text-orange-600 w-full')
-        options = {m['id']: m['name'] for m in manufacturers}
-        return ui.select(options=options, label=label, value=initial_value).classes('w-full')
+    match field_name:
+        case 'manufacturer_id':
+            manufacturers = db.get_manufacturers()
+            if not manufacturers:
+                return ui.label(f'{label}: No manufacturers available').classes('text-orange-600 w-full')
+            options = {m['id']: m['name'] for m in manufacturers}
+            return ui.select(options=options, label=label, value=initial_value).classes('w-full')
 
-    elif field_name == 'device_type_id':
-        types = db.get_device_types()
-        if not types:
-            return ui.label(f'{label}: No device types available').classes('text-orange-600 w-full')
-        options = {t['id']: t['device_type'] for t in types}
-        return ui.select(options=options, label=label, value=initial_value).classes('w-full')
+        case 'device_type_id':
+            types = db.get_device_types()
+            if not types:
+                return ui.label(f'{label}: No device types available').classes('text-orange-600 w-full')
+            options = {t['id']: t['device_type'] for t in types}
+            return ui.select(options=options, label=label, value=initial_value).classes('w-full')
 
-    elif field_name == 'department_id':
-        departments = db.get_departments()
-        if not departments:
-            return ui.label(f'{label}: No departments available').classes('text-orange-600 w-full')
-        options = {d['id']: d['name'] for d in departments}
-        return ui.select(options=options, label=label, value=initial_value).classes('w-full')
+        case 'department_id':
+            departments = db.get_departments()
+            if not departments:
+                return ui.label(f'{label}: No departments available').classes('text-orange-600 w-full')
+            options = {d['id']: d['name'] for d in departments}
+            return ui.select(options=options, label=label, value=initial_value).classes('w-full')
 
-    elif field_name == 'employee_id':
-        employees = db.get_employees()
-        if not employees and not is_nullable:
-            return ui.label(f'{label}: No employees available').classes('text-orange-600 w-full')
-        options = {e['id']: f"{e['first_name']} {e['last_name']}" for e in employees}
-        if is_nullable:
-            options[None] = '(None)'
-        return ui.select(options=options, label=label, value=initial_value).classes('w-full')
+        case 'employee_id':
+            employees = db.get_employees()
+            if not employees and not is_nullable:
+                return ui.label(f'{label}: No employees available').classes('text-orange-600 w-full')
+            options = {e['id']: f"{e['first_name']} {e['last_name']}" for e in employees}
+            if is_nullable:
+                options[None] = '(None)'
+            return ui.select(options=options, label=label, value=initial_value).classes('w-full')
 
-    elif field_name == 'device_id':
-        # For new devices_issued entries, only show available devices
-        if table_name == 'devices_issued' and is_new:
-            devices = db.get_available_devices()
-            if not devices:
-                return ui.label(f'{label}: No available devices to issue').classes('text-orange-600 w-full')
-        else:
-            devices = db.get_devices()
-            if not devices:
-                return ui.label(f'{label}: No devices available').classes('text-orange-600 w-full')
-        options = {d['id']: f"{d['model']} ({d['serial_number']})" for d in devices}
-        return ui.select(options=options, label=label, value=initial_value).classes('w-full')
+        case 'device_id':
+            # For new devices_issued entries, only show available devices
+            if table_name == 'devices_issued' and is_new:
+                devices = db.get_available_devices()
+                if not devices:
+                    return ui.label(f'{label}: No available devices to issue').classes('text-orange-600 w-full')
+            else:
+                devices = db.get_devices()
+                if not devices:
+                    return ui.label(f'{label}: No devices available').classes('text-orange-600 w-full')
+            options = {d['id']: f"{d['model']} ({d['serial_number']})" for d in devices}
+            return ui.select(options=options, label=label, value=initial_value).classes('w-full')
 
-    # Handle timestamps
-    elif 'timestamp' in field_type or 'datetime' in field_type:
-        value_str = initial_value.strftime('%Y-%m-%dT%H:%M') if initial_value else ''
-        return ui.input(label=label, value=value_str).props('type=datetime-local').classes('w-full')
+        case _:
+            # Handle timestamps
+            if 'timestamp' in field_type or 'datetime' in field_type:
+                value_str = initial_value.strftime('%Y-%m-%dT%H:%M') if initial_value else ''
+                return ui.input(label=label, value=value_str).props('type=datetime-local').classes('w-full')
 
-    # Handle integers
-    elif 'int' in field_type:
-        return ui.number(label=label, value=initial_value if initial_value is not None else 0).classes('w-full')
+            # Handle integers
+            elif 'int' in field_type:
+                return ui.number(label=label, value=initial_value if initial_value is not None else 0).classes('w-full')
 
-    # Handle text fields
-    else:
-        return ui.input(label=label, value=initial_value if initial_value else '').classes('w-full')
+            # Handle text fields
+            else:
+                return ui.input(label=label, value=initial_value if initial_value else '').classes('w-full')
 
 
 async def show_new_entry_dialog(table_display_name: str):
-    """Show dialog for creating a new entry"""
+    # Show dialog for creating a new entry
     table_name = TABLE_CONFIG[table_display_name]
     columns = db.get_table_columns(table_name)
 
@@ -173,7 +178,7 @@ async def show_new_entry_dialog(table_display_name: str):
 
 
 async def save_new_entry(dialog, table_name: str, form_fields: Dict):
-    """Save a new entry to the database"""
+    # Save a new entry to the database
     try:
         data = {}
         for field_name, field_widget in form_fields.items():
@@ -200,7 +205,7 @@ async def save_new_entry(dialog, table_name: str, form_fields: Dict):
 
 
 async def show_edit_dialog(table_display_name: str, row_id: int):
-    """Show dialog for editing an entry"""
+    # Show dialog for editing an entry
     table_name = TABLE_CONFIG[table_display_name]
     row_data = db.get_row_by_id(table_name, row_id)
     columns = db.get_table_columns(table_name)
@@ -230,7 +235,7 @@ async def show_edit_dialog(table_display_name: str, row_id: int):
 
 
 async def save_edit(dialog, table_name: str, row_id: int, form_fields: Dict):
-    """Save edited entry to the database"""
+    # Save edited entry to the database
     try:
         data = {}
         for field_name, field_widget in form_fields.items():
@@ -256,7 +261,7 @@ async def save_edit(dialog, table_name: str, row_id: int, form_fields: Dict):
 
 
 async def show_delete_dialog(table_display_name: str, row_id: int):
-    """Show confirmation dialog for deleting an entry"""
+    # Show confirmation dialog for deleting an entry
     table_name = TABLE_CONFIG[table_display_name]
 
     with ui.dialog() as dialog, ui.card():
@@ -272,7 +277,7 @@ async def show_delete_dialog(table_display_name: str, row_id: int):
 
 
 async def confirm_delete(dialog, table_name: str, row_id: int):
-    """Delete the entry from the database"""
+    # Delete the entry from the database
     try:
         success = db.delete_row(table_name, row_id)
         if success:
@@ -287,7 +292,7 @@ async def confirm_delete(dialog, table_name: str, row_id: int):
 
 
 def render_table_page(table_display_name: str, items_per_page: int, current_page: int):
-    """Render the table display page"""
+    # Render the table display page
     table_name = TABLE_CONFIG[table_display_name]
 
     # Calculate offset
@@ -375,7 +380,7 @@ def render_table_page(table_display_name: str, items_per_page: int, current_page
 
 @ui.page('/')
 def main_page(table: str = 'Devices', page: int = 1, per_page: int = 25):
-    """Main page with navigation and content"""
+    # Main page with navigation and content
 
     # Validate table name
     if table not in TABLE_CONFIG:
@@ -392,7 +397,7 @@ def main_page(table: str = 'Devices', page: int = 1, per_page: int = 25):
         app.storage.user['dark_mode'] = dark.value
 
     with ui.left_drawer(fixed=True).classes('bg-gray-100 dark:bg-gray-900').style('width: 250px'):
-        ui.label('Scooteq Database').classes('text-xl font-bold p-4')
+        ui.label('ScooTeq Database').classes('text-xl font-bold p-4')
 
         with ui.column().classes('w-full'):
             for table_name in TABLE_CONFIG.keys():
