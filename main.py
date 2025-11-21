@@ -27,6 +27,15 @@ def format_value(value: Any) -> str:
     return str(value)
 
 
+def format_field_label(field_name: str) -> str:
+    """Format field name for display, removing '_id' suffix"""
+    label = field_name.replace('_', ' ').title()
+    # Remove " Id" suffix from foreign key fields
+    if label.endswith(' Id') and field_name != 'id':
+        label = label[:-3]  # Remove the last 3 characters (" Id")
+    return label
+
+
 def get_foreign_key_display(table_name: str, column_name: str, value: Any) -> str:
     """Get display value for foreign keys"""
     if value is None:
@@ -78,7 +87,7 @@ def create_form_field(column_info: Dict[str, Any], initial_value: Any = None, ta
     if table_name == 'devices_issued' and field_name == 'date_of_issue' and is_new:
         return None
 
-    label = field_name.replace('_', ' ').title()
+    label = format_field_label(field_name)
 
     # Handle foreign keys with dropdowns
     if field_name == 'manufacturer_id':
@@ -330,7 +339,7 @@ def render_table_page(table_display_name: str, items_per_page: int, current_page
         column_names = [col['Field'] for col in columns_info]
 
         # Create table headers with Edit column
-        headers = [{'name': col, 'label': col.replace('_', ' ').title(), 'field': col, 'sortable': True, 'align': 'left'} for col in column_names]
+        headers = [{'name': col, 'label': format_field_label(col), 'field': col, 'sortable': True, 'align': 'left'} for col in column_names]
         headers.append({'name': 'actions', 'label': 'Actions', 'field': 'actions', 'sortable': False})
 
         # Prepare rows with formatted values
