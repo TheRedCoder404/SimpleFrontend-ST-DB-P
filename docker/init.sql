@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS manufacturer (
 CREATE TABLE IF NOT EXISTS device_types (
     id INT AUTO_INCREMENT PRIMARY KEY,
     device_type VARCHAR(255) NOT NULL,
+    specification TEXT,
     description TEXT
 );
 
@@ -32,7 +33,7 @@ CREATE TABLE IF NOT EXISTS devices (
     device_type_id INT,
     db VARCHAR(255),
     serial_number VARCHAR(255),
-    key_performance VARCHAR(255),
+    key_performance JSON,
     last_maintenance TIMESTAMP NULL,
     FOREIGN KEY (manufacturer_id) REFERENCES manufacturer(id),
     FOREIGN KEY (device_type_id) REFERENCES device_types(id)
