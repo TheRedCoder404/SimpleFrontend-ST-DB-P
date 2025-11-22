@@ -43,18 +43,30 @@ def parse_specification(specification: str) -> List[str]:
     return [attr.strip() for attr in specification.split(',') if attr.strip()]
 
 
-def format_json_for_display(json_data: Any) -> str:
+def format_json_for_display(json_data: Any, collapsed: bool = True) -> dict:
     # Format JSON key_performance data for table display
-    # Only show keys with non-empty values
+    # Returns dict with 'collapsed' and 'expanded' versions
     if not json_data or not isinstance(json_data, dict):
-        return ''
+        return {'collapsed': '', 'expanded': '', 'has_more': False}
 
     formatted_pairs = []
     for key, value in json_data.items():
         if value:  # Only include non-empty values
             formatted_pairs.append(f"{key}: {value}")
 
-    return ', '.join(formatted_pairs)
+    if len(formatted_pairs) <= 3:
+        display_text = '<br>'.join(formatted_pairs)
+        return {'collapsed': display_text, 'expanded': display_text, 'has_more': False}
+    else:
+        # Collapsed: Show first 3 and indicate how many more
+        first_three = '<br>'.join(formatted_pairs[:3])
+        remaining = len(formatted_pairs) - 3
+        collapsed_text = f"{first_three}<br><span style='color: #666; font-style: italic;'>(+{remaining} more - click to expand)</span>"
+
+        # Expanded: Show all
+        expanded_text = '<br>'.join(formatted_pairs)
+
+        return {'collapsed': collapsed_text, 'expanded': expanded_text, 'has_more': True}
 
 
 def get_foreign_key_display(table_name: str, column_name: str, value: Any) -> str:
@@ -533,13 +545,25 @@ def render_table_page(table_display_name: str, items_per_page: int, current_page
                             json_value = json.loads(value)
                         except:
                             json_value = value
-                    formatted_row[col] = format_json_for_display(json_value)
+                    kp_data = format_json_for_display(json_value)
+                    formatted_row[col] = kp_data['collapsed']
+                    formatted_row['key_performance_expanded'] = kp_data['expanded']
+                    formatted_row['key_performance_collapsed'] = kp_data['collapsed']
+                    formatted_row['is_expanded'] = False
                 else:
                     formatted_row[col] = format_value(value)
             formatted_row['_id'] = row['id']  # Store actual ID for edit
             rows.append(formatted_row)
 
         table = ui.table(columns=headers, rows=rows, row_key='_id').classes('w-full')
+
+        # Add custom slot for key_performance column with HTML rendering and click to expand
+        if table_name == 'devices':
+            table.add_slot('body-cell-key_performance', '''
+                <q-td :props="props" @click="props.row.is_expanded = !props.row.is_expanded; props.row.key_performance = props.row.is_expanded ? props.row.key_performance_expanded : props.row.key_performance_collapsed" style="cursor: pointer;">
+                    <div v-html="props.row.key_performance"></div>
+                </q-td>
+            ''')
 
         # Add edit and delete buttons to each row
         table.add_slot('body-cell-actions', '''
