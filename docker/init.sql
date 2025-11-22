@@ -42,8 +42,8 @@ CREATE TABLE IF NOT EXISTS devices (
 CREATE TABLE IF NOT EXISTS devices_issued (
     id INT AUTO_INCREMENT PRIMARY KEY,
     device_id INT NOT NULL UNIQUE,
-    employee_id INT NOT NULL,
-    department_id INT,
+    employee_id INT,
+    department_id INT NOT NULL,
     date_of_issue TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (device_id) REFERENCES devices(id),
     FOREIGN KEY (employee_id) REFERENCES employees(id),

@@ -1,8 +1,9 @@
 from nicegui import ui, app
 from database import Database
-from typing import Dict, Any
+from typing import Dict, Any, List
 from datetime import datetime
 import os
+import json
 
 # Initialize database
 db = Database()
@@ -32,6 +33,28 @@ def format_field_label(field_name: str) -> str:
     label = field_name.replace('_', ' ').title()
     # Remove " Id" suffix from foreign key fields
     return label.replace(' Id', '')
+
+
+def parse_specification(specification: str) -> List[str]:
+    # Parse specification string into list of attributes
+    if not specification:
+        return []
+    # Split by comma and trim whitespace from each attribute
+    return [attr.strip() for attr in specification.split(',') if attr.strip()]
+
+
+def format_json_for_display(json_data: Any) -> str:
+    # Format JSON key_performance data for table display
+    # Only show keys with non-empty values
+    if not json_data or not isinstance(json_data, dict):
+        return ''
+
+    formatted_pairs = []
+    for key, value in json_data.items():
+        if value:  # Only include non-empty values
+            formatted_pairs.append(f"{key}: {value}")
+
+    return ', '.join(formatted_pairs)
 
 
 def get_foreign_key_display(table_name: str, column_name: str, value: Any) -> str:
@@ -90,6 +113,10 @@ def create_form_field(column_info: Dict[str, Any], initial_value: Any = None, ta
     if table_name == 'devices_issued' and field_name == 'date_of_issue' and is_new:
         return None
 
+    # Skip key_performance - handled specially in dialog for devices table
+    if table_name == 'devices' and field_name == 'key_performance':
+        return None
+
     label = format_field_label(field_name)
 
     # Handle foreign keys with dropdowns
@@ -137,6 +164,10 @@ def create_form_field(column_info: Dict[str, Any], initial_value: Any = None, ta
             options = {d['id']: f"{d['model']} ({d['serial_number']})" for d in devices}
             return ui.select(options=options, label=label, value=initial_value).classes('w-full')
 
+        case 'specification':
+            # Handle specification field with textarea
+            return ui.textarea(label=label, value=initial_value if initial_value else '').classes('w-full')
+
         case _:
             # Handle timestamps
             if 'timestamp' in field_type or 'datetime' in field_type:
@@ -158,11 +189,12 @@ async def show_new_entry_dialog(table_display_name: str):
     columns = db.get_table_columns(table_name)
 
     form_fields = {}
+    key_performance_fields = {}
 
     with ui.dialog() as dialog, ui.card().classes('w-full max-w-2xl'):
         ui.label(f'New {table_display_name} Entry').classes('text-xl font-bold mb-4')
 
-        with ui.column().classes('w-full gap-2'):
+        with ui.column().classes('w-full gap-2') as form_column:
             for col in columns:
                 if col['Field'] == 'id':
                     continue
@@ -170,14 +202,64 @@ async def show_new_entry_dialog(table_display_name: str):
                 if field:
                     form_fields[col['Field']] = field
 
+            # Special handling for devices_issued: auto-select department when employee is picked
+            if table_name == 'devices_issued':
+                def update_department_from_employee():
+                    employee_id_field = form_fields.get('employee_id')
+                    department_id_field = form_fields.get('department_id')
+
+                    if employee_id_field and department_id_field and employee_id_field.value:
+                        employee = db.get_employee_by_id(employee_id_field.value)
+                        if employee and employee.get('department_id'):
+                            department_id_field.value = employee['department_id']
+
+                if 'employee_id' in form_fields:
+                    form_fields['employee_id'].on('update:model-value', lambda: update_department_from_employee())
+
+            # Special handling for key_performance in devices table
+            if table_name == 'devices':
+                ui.separator().classes('my-2')
+                ui.label('Key Performance Attributes').classes('text-lg font-semibold')
+
+                # Container for dynamic key_performance fields
+                kp_container = ui.column().classes('w-full gap-2')
+
+                # Function to update key_performance fields based on device_type
+                def update_kp_fields():
+                    kp_container.clear()
+                    key_performance_fields.clear()
+
+                    device_type_id = form_fields.get('device_type_id')
+                    if device_type_id and device_type_id.value:
+                        device_type = db.get_device_type_by_id(device_type_id.value)
+                        if device_type and device_type.get('specification'):
+                            attributes = parse_specification(device_type['specification'])
+                            with kp_container:
+                                for attr in attributes:
+                                    field = ui.input(label=attr, value='').classes('w-full')
+                                    key_performance_fields[attr] = field
+                        else:
+                            with kp_container:
+                                ui.label('No attributes defined for this device type').classes('text-gray-500')
+                    else:
+                        with kp_container:
+                            ui.label('Select a device type to see attributes').classes('text-gray-500')
+
+                # Bind the update function to device_type_id changes
+                if 'device_type_id' in form_fields:
+                    form_fields['device_type_id'].on('update:model-value', lambda: update_kp_fields())
+
+                # Initial call to set up fields
+                update_kp_fields()
+
         with ui.row().classes('w-full justify-end gap-2 mt-4'):
             ui.button('Cancel', on_click=dialog.close).props('flat')
-            ui.button('Create', on_click=lambda: save_new_entry(dialog, table_name, form_fields))
+            ui.button('Create', on_click=lambda: save_new_entry(dialog, table_name, form_fields, key_performance_fields))
 
     dialog.open()
 
 
-async def save_new_entry(dialog, table_name: str, form_fields: Dict):
+async def save_new_entry(dialog, table_name: str, form_fields: Dict, key_performance_fields: Dict = None):
     # Save a new entry to the database
     try:
         data = {}
@@ -194,6 +276,17 @@ async def save_new_entry(dialog, table_name: str, form_fields: Dict):
                     data[field_name] = value
             else:
                 data[field_name] = value
+
+        # Handle key_performance fields for devices table
+        if table_name == 'devices' and key_performance_fields:
+            key_performance_json = {}
+            for attr, field_widget in key_performance_fields.items():
+                value = field_widget.value
+                if value:  # Only include non-empty values
+                    key_performance_json[attr] = value
+
+            # Convert to JSON string
+            data['key_performance'] = json.dumps(key_performance_json) if key_performance_json else None
 
         db.insert_row(table_name, data)
         ui.notify('Entry created successfully!', type='positive')
@@ -215,6 +308,7 @@ async def show_edit_dialog(table_display_name: str, row_id: int):
         return
 
     form_fields = {}
+    key_performance_fields = {}
 
     with ui.dialog() as dialog, ui.card().classes('w-full max-w-2xl'):
         ui.label(f'Edit {table_display_name} Entry (ID: {row_id})').classes('text-xl font-bold mb-4')
@@ -227,14 +321,77 @@ async def show_edit_dialog(table_display_name: str, row_id: int):
                 if field:
                     form_fields[col['Field']] = field
 
+            # Special handling for devices_issued: auto-select department when employee is picked
+            if table_name == 'devices_issued':
+                def update_department_from_employee():
+                    employee_id_field = form_fields.get('employee_id')
+                    department_id_field = form_fields.get('department_id')
+
+                    if employee_id_field and department_id_field and employee_id_field.value:
+                        employee = db.get_employee_by_id(employee_id_field.value)
+                        if employee and employee.get('department_id'):
+                            department_id_field.value = employee['department_id']
+
+                if 'employee_id' in form_fields:
+                    form_fields['employee_id'].on('update:model-value', lambda: update_department_from_employee())
+
+            # Special handling for key_performance in devices table
+            if table_name == 'devices':
+                ui.separator().classes('my-2')
+                ui.label('Key Performance Attributes').classes('text-lg font-semibold')
+
+                # Container for dynamic key_performance fields
+                kp_container = ui.column().classes('w-full gap-2')
+
+                # Parse existing key_performance data
+                existing_kp = {}
+                if row_data.get('key_performance'):
+                    try:
+                        if isinstance(row_data['key_performance'], str):
+                            existing_kp = json.loads(row_data['key_performance'])
+                        elif isinstance(row_data['key_performance'], dict):
+                            existing_kp = row_data['key_performance']
+                    except:
+                        pass
+
+                # Function to update key_performance fields based on device_type
+                def update_kp_fields():
+                    kp_container.clear()
+                    key_performance_fields.clear()
+
+                    device_type_id = form_fields.get('device_type_id')
+                    if device_type_id and device_type_id.value:
+                        device_type = db.get_device_type_by_id(device_type_id.value)
+                        if device_type and device_type.get('specification'):
+                            attributes = parse_specification(device_type['specification'])
+                            with kp_container:
+                                for attr in attributes:
+                                    # Use existing value if available
+                                    initial_value = existing_kp.get(attr, '')
+                                    field = ui.input(label=attr, value=initial_value).classes('w-full')
+                                    key_performance_fields[attr] = field
+                        else:
+                            with kp_container:
+                                ui.label('No attributes defined for this device type').classes('text-gray-500')
+                    else:
+                        with kp_container:
+                            ui.label('Select a device type to see attributes').classes('text-gray-500')
+
+                # Bind the update function to device_type_id changes
+                if 'device_type_id' in form_fields:
+                    form_fields['device_type_id'].on('update:model-value', lambda: update_kp_fields())
+
+                # Initial call to set up fields
+                update_kp_fields()
+
         with ui.row().classes('w-full justify-end gap-2 mt-4'):
             ui.button('Cancel', on_click=dialog.close).props('flat')
-            ui.button('Save', on_click=lambda: save_edit(dialog, table_name, row_id, form_fields))
+            ui.button('Save', on_click=lambda: save_edit(dialog, table_name, row_id, form_fields, key_performance_fields))
 
     dialog.open()
 
 
-async def save_edit(dialog, table_name: str, row_id: int, form_fields: Dict):
+async def save_edit(dialog, table_name: str, row_id: int, form_fields: Dict, key_performance_fields: Dict = None):
     # Save edited entry to the database
     try:
         data = {}
@@ -250,6 +407,17 @@ async def save_edit(dialog, table_name: str, row_id: int, form_fields: Dict):
                     data[field_name] = value
             else:
                 data[field_name] = value
+
+        # Handle key_performance fields for devices table
+        if table_name == 'devices' and key_performance_fields:
+            key_performance_json = {}
+            for attr, field_widget in key_performance_fields.items():
+                value = field_widget.value
+                if value:  # Only include non-empty values
+                    key_performance_json[attr] = value
+
+            # Convert to JSON string
+            data['key_performance'] = json.dumps(key_performance_json) if key_performance_json else None
 
         db.update_row(table_name, row_id, data)
         ui.notify('Entry updated successfully!', type='positive')
@@ -356,6 +524,16 @@ def render_table_page(table_display_name: str, items_per_page: int, current_page
                 # Show foreign key display values
                 if col.endswith('_id') and col != 'id':
                     formatted_row[col] = get_foreign_key_display(table_name, col, value)
+                # Handle key_performance JSON display
+                elif col == 'key_performance':
+                    # Parse JSON if it's a string
+                    json_value = value
+                    if isinstance(value, str):
+                        try:
+                            json_value = json.loads(value)
+                        except:
+                            json_value = value
+                    formatted_row[col] = format_json_for_display(json_value)
                 else:
                     formatted_row[col] = format_value(value)
             formatted_row['_id'] = row['id']  # Store actual ID for edit
@@ -406,7 +584,7 @@ def main_page(table: str = 'Devices', page: int = 1, per_page: int = 25):
                     on_click=lambda t=table_name: ui.navigate.to(f'/?table={t}&page=1&per_page={per_page}')
                 ).props('flat align=left').classes('w-full')
 
-        # Dark mode toggle at bottom of sidebar
+        # Dark mode toggle and database operations at bottom of sidebar
         ui.separator().classes('my-4')
         with ui.row().classes('w-full px-4'):
             ui.switch('Dark mode').bind_value(dark).on('update:model-value', save_dark_mode)

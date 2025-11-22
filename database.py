@@ -116,6 +116,15 @@ class Database:
             cursor.close()
             return data
 
+    def get_device_type_by_id(self, device_type_id: int) -> Optional[Dict[str, Any]]:
+        """Get a device type by ID with specification"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute("SELECT id, device_type, specification, description FROM device_types WHERE id = %s", (device_type_id,))
+            data = cursor.fetchone()
+            cursor.close()
+            return data
+
     def get_departments(self) -> List[Dict[str, Any]]:
         """Get all departments for dropdown"""
         with self.get_connection() as conn:
@@ -131,6 +140,15 @@ class Database:
             cursor = conn.cursor(dictionary=True)
             cursor.execute("SELECT id, first_name, last_name FROM employees ORDER BY last_name, first_name")
             data = cursor.fetchall()
+            cursor.close()
+            return data
+
+    def get_employee_by_id(self, employee_id: int) -> Optional[Dict[str, Any]]:
+        """Get an employee by ID with their department"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute("SELECT id, first_name, last_name, department_id FROM employees WHERE id = %s", (employee_id,))
+            data = cursor.fetchone()
             cursor.close()
             return data
 
