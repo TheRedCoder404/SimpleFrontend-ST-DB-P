@@ -10,6 +10,7 @@ db = Database()
 
 # Table configuration mapping display names to table names
 TABLE_CONFIG = {
+    'Device Models': 'device_models',
     'Devices': 'devices',
     'Employees': 'employees',
     'Departments': 'departments',
@@ -105,6 +106,12 @@ def get_foreign_key_display(table_name: str, column_name: str, value: Any) -> st
                 for d in devices:
                     if d['id'] == value:
                         return f"{d['model']} ({d['serial_number']})"
+
+            case 'model_id':
+                device_models = db.get_device_models()
+                for dm in device_models:
+                    if dm['id'] == value:
+                        return f"{dm['model']} ({dm['manufacturer_name']})"
     except:
         pass
 
@@ -125,8 +132,8 @@ def create_form_field(column_info: Dict[str, Any], initial_value: Any = None, ta
     if table_name == 'devices_issued' and field_name == 'date_of_issue' and is_new:
         return None
 
-    # Skip key_performance - handled specially in dialog for devices table
-    if table_name == 'devices' and field_name == 'key_performance':
+    # Skip key_performance - handled specially in dialog for device_models table
+    if table_name == 'device_models' and field_name == 'key_performance':
         return None
 
     label = format_field_label(field_name)
@@ -174,6 +181,13 @@ def create_form_field(column_info: Dict[str, Any], initial_value: Any = None, ta
                 if not devices:
                     return ui.label(f'{label}: No devices available').classes('text-orange-600 w-full')
             options = {d['id']: f"{d['model']} ({d['serial_number']})" for d in devices}
+            return ui.select(options=options, label=label, value=initial_value).classes('w-full')
+
+        case 'model_id':
+            device_models = db.get_device_models()
+            if not device_models:
+                return ui.label(f'{label}: No device models available').classes('text-orange-600 w-full')
+            options = {dm['id']: f"{dm['model']} ({dm['manufacturer_name']})" for dm in device_models}
             return ui.select(options=options, label=label, value=initial_value).classes('w-full')
 
         case 'specification':
@@ -228,8 +242,8 @@ async def show_new_entry_dialog(table_display_name: str):
                 if 'employee_id' in form_fields:
                     form_fields['employee_id'].on('update:model-value', lambda: update_department_from_employee())
 
-            # Special handling for key_performance in devices table
-            if table_name == 'devices':
+            # Special handling for key_performance in device_models table
+            if table_name == 'device_models':
                 ui.separator().classes('my-2')
                 ui.label('Key Performance Attributes').classes('text-lg font-semibold')
 
@@ -289,8 +303,8 @@ async def save_new_entry(dialog, table_name: str, form_fields: Dict, key_perform
             else:
                 data[field_name] = value
 
-        # Handle key_performance fields for devices table
-        if table_name == 'devices' and key_performance_fields:
+        # Handle key_performance fields for device_models table
+        if table_name == 'device_models' and key_performance_fields:
             key_performance_json = {}
             for attr, field_widget in key_performance_fields.items():
                 value = field_widget.value
@@ -347,8 +361,8 @@ async def show_edit_dialog(table_display_name: str, row_id: int):
                 if 'employee_id' in form_fields:
                     form_fields['employee_id'].on('update:model-value', lambda: update_department_from_employee())
 
-            # Special handling for key_performance in devices table
-            if table_name == 'devices':
+            # Special handling for key_performance in device_models table
+            if table_name == 'device_models':
                 ui.separator().classes('my-2')
                 ui.label('Key Performance Attributes').classes('text-lg font-semibold')
 
@@ -420,8 +434,8 @@ async def save_edit(dialog, table_name: str, row_id: int, form_fields: Dict, key
             else:
                 data[field_name] = value
 
-        # Handle key_performance fields for devices table
-        if table_name == 'devices' and key_performance_fields:
+        # Handle key_performance fields for device_models table
+        if table_name == 'device_models' and key_performance_fields:
             key_performance_json = {}
             for attr, field_widget in key_performance_fields.items():
                 value = field_widget.value
@@ -558,7 +572,7 @@ def render_table_page(table_display_name: str, items_per_page: int, current_page
         table = ui.table(columns=headers, rows=rows, row_key='_id').classes('w-full')
 
         # Add custom slot for key_performance column with HTML rendering and click to expand
-        if table_name == 'devices':
+        if table_name == 'device_models':
             table.add_slot('body-cell-key_performance', '''
                 <q-td :props="props" @click="props.row.is_expanded = !props.row.is_expanded; props.row.key_performance = props.row.is_expanded ? props.row.key_performance_expanded : props.row.key_performance_collapsed" style="cursor: pointer;">
                     <div v-html="props.row.key_performance"></div>

@@ -156,7 +156,12 @@ class Database:
         """Get all devices for dropdown"""
         with self.get_connection() as conn:
             cursor = conn.cursor(dictionary=True)
-            cursor.execute("SELECT id, model, serial_number FROM devices ORDER BY model")
+            cursor.execute("""
+                SELECT d.id, dm.model, d.serial_number
+                FROM devices d
+                JOIN device_models dm ON d.model_id = dm.id
+                ORDER BY dm.model
+            """)
             data = cursor.fetchall()
             cursor.close()
             return data
@@ -166,10 +171,26 @@ class Database:
         with self.get_connection() as conn:
             cursor = conn.cursor(dictionary=True)
             cursor.execute("""
-                SELECT d.id, d.model, d.serial_number
+                SELECT d.id, dm.model, d.serial_number
                 FROM devices d
+                JOIN device_models dm ON d.model_id = dm.id
                 WHERE d.id NOT IN (SELECT device_id FROM devices_issued)
-                ORDER BY d.model
+                ORDER BY dm.model
+            """)
+            data = cursor.fetchall()
+            cursor.close()
+            return data
+
+    def get_device_models(self) -> List[Dict[str, Any]]:
+        """Get all device models for dropdown"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute("""
+                SELECT dm.id, dm.model, m.name as manufacturer_name, dt.device_type
+                FROM device_models dm
+                LEFT JOIN manufacturer m ON dm.manufacturer_id = m.id
+                LEFT JOIN device_types dt ON dm.device_type_id = dt.id
+                ORDER BY dm.model
             """)
             data = cursor.fetchall()
             cursor.close()

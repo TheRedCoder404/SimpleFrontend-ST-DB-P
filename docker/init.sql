@@ -26,17 +26,23 @@ CREATE TABLE IF NOT EXISTS employees (
     FOREIGN KEY (department_id) REFERENCES departments(id)
 );
 
-CREATE TABLE IF NOT EXISTS devices (
+CREATE TABLE IF NOT EXISTS device_models (
     id INT AUTO_INCREMENT PRIMARY KEY,
     model VARCHAR(255) NOT NULL,
     manufacturer_id INT,
     device_type_id INT,
     db VARCHAR(255),
-    serial_number VARCHAR(255),
     key_performance JSON,
-    last_maintenance TIMESTAMP NULL,
     FOREIGN KEY (manufacturer_id) REFERENCES manufacturer(id),
     FOREIGN KEY (device_type_id) REFERENCES device_types(id)
+);
+
+CREATE TABLE IF NOT EXISTS devices (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    model_id INT NOT NULL,
+    serial_number VARCHAR(255),
+    last_maintenance TIMESTAMP NULL,
+    FOREIGN KEY (model_id) REFERENCES device_models(id)
 );
 
 CREATE TABLE IF NOT EXISTS devices_issued (
