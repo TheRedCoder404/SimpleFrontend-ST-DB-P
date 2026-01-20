@@ -49,6 +49,11 @@ A web-based CRUD interface for managing MySQL database tables, built with NiceGU
    # Uncomment and modify the SQL statements in init.sql
    nano init.sql
    ```
+   
+5. (Optional) If you want to load default values (Database must be running)
+    ```bash
+    mysql -h localhost -P 3306 --protocol=tcp -u root -psecret scooteq_database < dump.sql
+    ```
 
 ### Deployment
 
